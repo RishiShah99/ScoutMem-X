@@ -1,0 +1,10 @@
+{
+  "phase": "mvp2",
+  "subphase": "2.5",
+  "mode": "baseline_compare",
+  "max_steps": 5,
+  "query": "find the red mug",
+  "target_label": "red mug",
+  "stop_threshold": 0.8,
+  "split": "unseen"
+}

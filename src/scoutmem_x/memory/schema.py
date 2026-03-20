@@ -51,6 +51,7 @@ class MemorySnapshot:
     unexplored_regions: RegionHint = ()
     revisitable_object_ids: tuple[str, ...] = ()
     evidence_sufficiency_score: float = 0.0
+    target_object_id: str | None = None
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.evidence_sufficiency_score <= 1.0:

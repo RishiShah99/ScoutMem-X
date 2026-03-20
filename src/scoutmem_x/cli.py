@@ -5,7 +5,11 @@ import json
 from pathlib import Path
 
 from scoutmem_x.config import load_config
-from scoutmem_x.eval import evaluate_reactive_baseline
+from scoutmem_x.eval import (
+    compare_baselines,
+    evaluate_passive_memory_baseline,
+    evaluate_reactive_baseline,
+)
 from scoutmem_x.serialization import to_jsonable
 from scoutmem_x.tasks import run_toy_episode
 
@@ -52,6 +56,23 @@ def main() -> int:
             "message": "ScoutMem-X reactive baseline evaluation executed.",
             "config": to_jsonable(config),
             "summary": to_jsonable(summary),
+        }
+    elif config.mode == "memory_eval":
+        summary = evaluate_passive_memory_baseline(config)
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X passive memory evaluation executed.",
+            "config": to_jsonable(config),
+            "summary": to_jsonable(summary),
+        }
+    elif config.mode == "baseline_compare":
+        reactive_summary, memory_summary = compare_baselines(config)
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X baseline comparison executed.",
+            "config": to_jsonable(config),
+            "reactive_summary": to_jsonable(reactive_summary),
+            "passive_memory_summary": to_jsonable(memory_summary),
         }
     else:
         raise ValueError(f"Unsupported mode: {config.mode}")

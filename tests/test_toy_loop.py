@@ -45,7 +45,8 @@ def test_toy_episode_stops_after_confident_detection() -> None:
     assert result.trace.final_action().action_type.value == "stop"
     assert result.trace.success is True
     assert result.final_memory.evidence_sufficiency_score >= 0.8
-    assert len(result.final_memory.nodes) == 3
+    assert len(result.final_memory.nodes) == 1
+    assert result.final_memory.nodes[0].supporting_frames == ("frame-0", "frame-1", "frame-2")
 
 
 def test_cli_toy_loop_outputs_trace() -> None:

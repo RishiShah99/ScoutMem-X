@@ -4,9 +4,14 @@ from dataclasses import dataclass
 
 from scoutmem_x.config import AppConfig
 from scoutmem_x.env import GridSearchEnv, SearchSceneSpec
-from scoutmem_x.memory import build_memory_snapshot
+from scoutmem_x.memory import MemorySnapshot, build_memory_snapshot, retrieve_best_node
 from scoutmem_x.perception import OraclePerceptionAdapter, PerceptionAdapter
-from scoutmem_x.policy import choose_reactive_action
+from scoutmem_x.policy import (
+    ActionType,
+    AgentAction,
+    choose_passive_memory_action,
+    choose_reactive_action,
+)
 from scoutmem_x.tasks.episode import EpisodeStepRecord, EpisodeTrace
 
 
@@ -17,6 +22,20 @@ class SearchEpisodeResult:
     steps_taken: int
     scene_id: str
     split: str
+    final_memory: MemorySnapshot
+
+
+def run_passive_memory_search_episode(
+    scene: SearchSceneSpec,
+    config: AppConfig,
+    perception_adapter: PerceptionAdapter | None = None,
+) -> SearchEpisodeResult:
+    return _run_search_episode(
+        scene=scene,
+        config=config,
+        perception_adapter=perception_adapter,
+        use_persistent_memory=True,
+    )
 
 
 def run_reactive_search_episode(
@@ -24,11 +43,26 @@ def run_reactive_search_episode(
     config: AppConfig,
     perception_adapter: PerceptionAdapter | None = None,
 ) -> SearchEpisodeResult:
+    return _run_search_episode(
+        scene=scene,
+        config=config,
+        perception_adapter=perception_adapter,
+        use_persistent_memory=False,
+    )
+
+
+def _run_search_episode(
+    scene: SearchSceneSpec,
+    config: AppConfig,
+    perception_adapter: PerceptionAdapter | None,
+    use_persistent_memory: bool,
+) -> SearchEpisodeResult:
     env = GridSearchEnv(scene=scene)
     adapter = perception_adapter or OraclePerceptionAdapter()
     observation = env.reset()
     step_records: list[EpisodeStepRecord] = []
     found_target = False
+    memory_snapshot = MemorySnapshot()
 
     for step_index in range(config.max_steps):
         detections = adapter.predict(observation=observation, query=config.query)
@@ -36,15 +70,24 @@ def run_reactive_search_episode(
             observation=observation,
             detections=detections,
             target_label=config.target_label,
-            previous_snapshot=None,
+            previous_snapshot=memory_snapshot if use_persistent_memory else None,
         )
-        action = choose_reactive_action(
-            detections=detections,
-            target_label=config.target_label,
-            stop_threshold=config.stop_threshold,
-            max_steps=config.max_steps,
-            step_index=step_index,
-        )
+        if use_persistent_memory:
+            action = choose_passive_memory_action(
+                memory_snapshot=memory_snapshot,
+                target_label=config.target_label,
+                stop_threshold=config.stop_threshold,
+                max_steps=config.max_steps,
+                step_index=step_index,
+            )
+        else:
+            action = choose_reactive_action(
+                detections=detections,
+                target_label=config.target_label,
+                stop_threshold=config.stop_threshold,
+                max_steps=config.max_steps,
+                step_index=step_index,
+            )
         step_records.append(
             EpisodeStepRecord(
                 observation=observation,
@@ -56,7 +99,12 @@ def run_reactive_search_episode(
         )
         transition = env.step(action=action, step_index=step_index)
         observation = transition.observation
-        found_target = transition.found_target
+        found_target = _is_episode_successful(
+            scene=scene,
+            action=action,
+            memory_snapshot=memory_snapshot,
+            transition_found_target=transition.found_target,
+        )
         if transition.done:
             break
 
@@ -73,4 +121,21 @@ def run_reactive_search_episode(
         steps_taken=trace.step_count,
         scene_id=scene.scene_id,
         split=scene.split,
+        final_memory=memory_snapshot,
     )
+
+
+def _is_episode_successful(
+    scene: SearchSceneSpec,
+    action: AgentAction,
+    memory_snapshot: MemorySnapshot,
+    transition_found_target: bool,
+) -> bool:
+    if transition_found_target:
+        return True
+    if action.action_type != ActionType.STOP:
+        return False
+    best_node = retrieve_best_node(memory_snapshot, scene.target_label)
+    if best_node is None:
+        return False
+    return best_node.confidence >= memory_snapshot.evidence_sufficiency_score >= 0.8

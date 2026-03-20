@@ -13,6 +13,7 @@ DEFAULT_SCENES: tuple[SearchSceneSpec, ...] = (
         length=5,
         target_label="red mug",
         target_position=2,
+        target_visibility={2: 0.95},
         distractors={1: "blue bowl"},
     ),
     SearchSceneSpec(
@@ -21,6 +22,7 @@ DEFAULT_SCENES: tuple[SearchSceneSpec, ...] = (
         length=6,
         target_label="red mug",
         target_position=3,
+        target_visibility={3: 0.95},
         distractors={2: "red book"},
     ),
     SearchSceneSpec(
@@ -29,15 +31,17 @@ DEFAULT_SCENES: tuple[SearchSceneSpec, ...] = (
         length=5,
         target_label="red mug",
         target_position=2,
+        target_visibility={2: 0.95},
         distractors={0: "paint can"},
     ),
     SearchSceneSpec(
         scene_id="hall_unseen_hard",
         split="unseen",
-        length=7,
+        length=6,
         target_label="red mug",
-        target_position=6,
-        distractors={3: "red bottle"},
+        target_position=5,
+        target_visibility={3: 0.55, 4: 0.65},
+        distractors={2: "red bottle"},
     ),
 )
 
@@ -99,8 +103,9 @@ class GridSearchEnv:
         )
 
     def _visible_object(self) -> tuple[str, float]:
-        if self.agent_position == self.scene.target_position:
-            return self.scene.target_label, 0.95
+        target_score = self.scene.target_visibility.get(self.agent_position)
+        if target_score is not None:
+            return self.scene.target_label, target_score
         distractor = self.scene.distractors.get(self.agent_position)
         if distractor is not None:
             return distractor, 0.55
