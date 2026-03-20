@@ -5,6 +5,8 @@ Phased research engineering project for embodied search under partial observabil
 ## Quick Start
 
 ```bash
+conda create -n sceneforge python=3.10.19 -y
+conda activate sceneforge
 python -m pip install -e .[dev]
 python -m scoutmem_x.cli --config configs/dev.json
 python -m pytest
