@@ -1,0 +1,7 @@
+{
+  "phase": "mvp0",
+  "subphase": "0.1",
+  "mode": "scaffold",
+  "max_steps": 3,
+  "query": "find the red mug"
+}
