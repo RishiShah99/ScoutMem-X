@@ -20,6 +20,9 @@ python -m pytest
 - perception adapter contract
 - core typed schemas
 - toy observe -> predict -> update -> act -> trace loop
+- lightweight embodied search environment wrapper
+- reactive frame-only search baseline
+- seen/unseen evaluation configs and summaries
 - initial test harness
 
 See `AGENTS.md` for the phased build workflow and project conventions.

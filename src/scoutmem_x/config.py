@@ -5,6 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def _coerce_scene_ids(value: object) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ValueError("scene_ids must be a list of strings when provided")
+    return tuple(str(item) for item in value)
+
+
 @dataclass(frozen=True)
 class AppConfig:
     phase: str
@@ -14,6 +22,8 @@ class AppConfig:
     query: str
     target_label: str
     stop_threshold: float
+    split: str = "dev"
+    scene_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.max_steps <= 0:
@@ -33,4 +43,6 @@ def load_config(path: str | Path) -> AppConfig:
         query=str(raw["query"]),
         target_label=str(raw.get("target_label", raw["query"])),
         stop_threshold=float(raw.get("stop_threshold", 0.8)),
+        split=str(raw.get("split", "dev")),
+        scene_ids=_coerce_scene_ids(raw.get("scene_ids")),
     )

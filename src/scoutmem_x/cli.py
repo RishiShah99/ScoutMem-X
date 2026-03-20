@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from scoutmem_x.config import load_config
+from scoutmem_x.eval import evaluate_reactive_baseline
 from scoutmem_x.serialization import to_jsonable
 from scoutmem_x.tasks import run_toy_episode
 
@@ -43,6 +44,14 @@ def main() -> int:
             "config": to_jsonable(config),
             "trace": to_jsonable(result.trace),
             "final_memory": to_jsonable(result.final_memory),
+        }
+    elif config.mode == "baseline_eval":
+        summary = evaluate_reactive_baseline(config)
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X reactive baseline evaluation executed.",
+            "config": to_jsonable(config),
+            "summary": to_jsonable(summary),
         }
     else:
         raise ValueError(f"Unsupported mode: {config.mode}")

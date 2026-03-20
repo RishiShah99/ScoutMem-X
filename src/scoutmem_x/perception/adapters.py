@@ -37,3 +37,26 @@ class MockPerceptionAdapter:
                 },
             )
         ]
+
+
+class OraclePerceptionAdapter:
+    def predict(self, observation: Any, query: str) -> list[Detection]:
+        metadata = getattr(observation, "metadata", {})
+        label = metadata.get("visible_label", "")
+        score = float(metadata.get("visible_score", "0.0"))
+        if not label or score <= 0.0:
+            return []
+
+        return [
+            Detection(
+                label=label,
+                score=score,
+                region=(0, 0, 12, 12),
+                metadata={
+                    "query": query,
+                    "source": "oracle",
+                    "region": metadata.get("visible_region", "forward_cell"),
+                    "target_label": query.replace("find the ", ""),
+                },
+            )
+        ]
