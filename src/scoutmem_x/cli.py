@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 from scoutmem_x.config import load_config
 from scoutmem_x.serialization import to_jsonable
@@ -14,6 +15,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         default="configs/dev.json",
         help="Path to the JSON config file for the current scaffold run.",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Optional path to write the JSON payload to disk.",
     )
     return parser
 
@@ -41,7 +47,13 @@ def main() -> int:
     else:
         raise ValueError(f"Unsupported mode: {config.mode}")
 
-    print(json.dumps(payload, indent=2, sort_keys=True))
+    rendered = json.dumps(payload, indent=2, sort_keys=True)
+    if args.output is not None:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(f"{rendered}\n", encoding="utf-8")
+
+    print(rendered)
     return 0
 
 

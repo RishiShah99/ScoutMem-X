@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_cli_scaffold_output() -> None:
     env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
     result = subprocess.run(
-        [sys.executable, "-m", "scoutmem_x.cli", "--config", "configs/dev.json"],
+        [sys.executable, "-m", "scoutmem_x.cli", "--config", "configs/scaffold.json"],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -23,4 +23,5 @@ def test_cli_scaffold_output() -> None:
     payload = json.loads(result.stdout)
     assert payload["status"] == "ok"
     assert payload["config"]["phase"] == "mvp0"
-    assert payload["config"]["subphase"] == "0.3"
+    assert payload["config"]["subphase"] == "0.1"
+    assert payload["message"] == "ScoutMem-X scaffold is ready for MVP-0."

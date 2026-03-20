@@ -65,3 +65,28 @@ def test_cli_toy_loop_outputs_trace() -> None:
     assert len(payload["trace"]["steps"]) == 3
     assert payload["trace"]["steps"][-1]["action"]["action_type"] == "stop"
     assert payload["final_memory"]["evidence_sufficiency_score"] >= 0.8
+
+
+def test_cli_can_write_output_file(tmp_path: Path) -> None:
+    env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+    output_path = tmp_path / "toy-trace.json"
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "scoutmem_x.cli",
+            "--config",
+            "configs/dev.json",
+            "--output",
+            str(output_path),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["trace"]["steps"][-1]["action"]["action_type"] == "stop"
