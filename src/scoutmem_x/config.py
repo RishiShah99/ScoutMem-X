@@ -12,6 +12,14 @@ class AppConfig:
     mode: str
     max_steps: int
     query: str
+    target_label: str
+    stop_threshold: float
+
+    def __post_init__(self) -> None:
+        if self.max_steps <= 0:
+            raise ValueError("max_steps must be positive")
+        if not 0.0 <= self.stop_threshold <= 1.0:
+            raise ValueError("stop_threshold must be between 0.0 and 1.0")
 
 
 def load_config(path: str | Path) -> AppConfig:
@@ -23,4 +31,6 @@ def load_config(path: str | Path) -> AppConfig:
         mode=str(raw["mode"]),
         max_steps=int(raw["max_steps"]),
         query=str(raw["query"]),
+        target_label=str(raw.get("target_label", raw["query"])),
+        stop_threshold=float(raw.get("stop_threshold", 0.8)),
     )

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict
 
 from scoutmem_x.config import load_config
+from scoutmem_x.serialization import to_jsonable
+from scoutmem_x.tasks import run_toy_episode
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,11 +23,24 @@ def main() -> int:
     args = parser.parse_args()
     config = load_config(args.config)
 
-    payload = {
-        "status": "ok",
-        "message": "ScoutMem-X scaffold is ready for MVP-0.",
-        "config": asdict(config),
-    }
+    if config.mode == "scaffold":
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X scaffold is ready for MVP-0.",
+            "config": to_jsonable(config),
+        }
+    elif config.mode == "toy_loop":
+        result = run_toy_episode(config)
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X toy loop executed.",
+            "config": to_jsonable(config),
+            "trace": to_jsonable(result.trace),
+            "final_memory": to_jsonable(result.final_memory),
+        }
+    else:
+        raise ValueError(f"Unsupported mode: {config.mode}")
+
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 

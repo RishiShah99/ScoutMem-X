@@ -23,4 +23,4 @@ def test_cli_scaffold_output() -> None:
     payload = json.loads(result.stdout)
     assert payload["status"] == "ok"
     assert payload["config"]["phase"] == "mvp0"
-    assert payload["config"]["subphase"] == "0.1"
+    assert payload["config"]["subphase"] == "0.3"

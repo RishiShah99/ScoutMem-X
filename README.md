@@ -18,6 +18,8 @@ python -m pytest
 - package + CLI entry point
 - config loading
 - perception adapter contract
+- core typed schemas
+- toy observe -> predict -> update -> act -> trace loop
 - initial test harness
 
 See `AGENTS.md` for the phased build workflow and project conventions.

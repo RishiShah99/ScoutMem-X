@@ -22,12 +22,18 @@ class PerceptionAdapter(Protocol):
 
 class MockPerceptionAdapter:
     def predict(self, observation: Any, query: str) -> list[Detection]:
-        del observation
+        step_index = getattr(observation, "step_index", 0)
+        score = min(0.35 + 0.25 * step_index, 0.95)
         return [
             Detection(
-                label="target_hint",
-                score=0.5,
+                label="red mug",
+                score=score,
                 region=(0, 0, 10, 10),
-                metadata={"query": query, "source": "mock"},
+                metadata={
+                    "query": query,
+                    "source": "mock",
+                    "region": "countertop",
+                    "target_label": "red mug",
+                },
             )
         ]

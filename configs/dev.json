@@ -1,7 +1,9 @@
 {
   "phase": "mvp0",
-  "subphase": "0.1",
-  "mode": "scaffold",
+  "subphase": "0.3",
+  "mode": "toy_loop",
   "max_steps": 3,
-  "query": "find the red mug"
+  "query": "find the red mug",
+  "target_label": "red mug",
+  "stop_threshold": 0.8
 }
