@@ -4,7 +4,11 @@ from dataclasses import dataclass
 
 from scoutmem_x.config import AppConfig
 from scoutmem_x.env import SearchSceneSpec, load_default_scenes
-from scoutmem_x.tasks import run_passive_memory_search_episode, run_reactive_search_episode
+from scoutmem_x.tasks import (
+    run_active_evidence_search_episode,
+    run_passive_memory_search_episode,
+    run_reactive_search_episode,
+)
 
 
 @dataclass(frozen=True)
@@ -41,12 +45,26 @@ def compare_baselines(config: AppConfig) -> tuple[EvalSummary, EvalSummary]:
     )
 
 
+def evaluate_active_evidence_baseline(config: AppConfig) -> EvalSummary:
+    return _evaluate_baseline(config=config, baseline="active_evidence")
+
+
+def compare_active_baselines(config: AppConfig) -> tuple[EvalSummary, EvalSummary, EvalSummary]:
+    return (
+        evaluate_reactive_baseline(config=config),
+        evaluate_passive_memory_baseline(config=config),
+        evaluate_active_evidence_baseline(config=config),
+    )
+
+
 def _evaluate_baseline(config: AppConfig, baseline: str) -> EvalSummary:
     scenes = _select_scenes(config)
     runner = (
         run_reactive_search_episode
         if baseline == "reactive"
         else run_passive_memory_search_episode
+        if baseline == "passive_memory"
+        else run_active_evidence_search_episode
     )
     results = [runner(scene=scene, config=config) for scene in scenes]
     episode_briefs = tuple(
@@ -78,4 +96,6 @@ def _select_scenes(config: AppConfig) -> tuple[SearchSceneSpec, ...]:
     if config.scene_ids:
         requested_ids = set(config.scene_ids)
         filtered = tuple(scene for scene in filtered if scene.scene_id in requested_ids)
+    else:
+        filtered = tuple(scene for scene in filtered if scene.include_in_default_eval)
     return filtered

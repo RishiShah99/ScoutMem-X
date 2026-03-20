@@ -22,6 +22,8 @@ python -m pytest
 - toy observe -> predict -> update -> act -> trace loop
 - lightweight embodied search environment wrapper
 - reactive frame-only search baseline
+- passive-memory baseline with structured retrieval
+- uncertainty-aware active evidence baseline
 - seen/unseen evaluation configs and summaries
 - initial test harness
 

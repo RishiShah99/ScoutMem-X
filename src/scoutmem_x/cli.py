@@ -6,7 +6,9 @@ from pathlib import Path
 
 from scoutmem_x.config import load_config
 from scoutmem_x.eval import (
+    compare_active_baselines,
     compare_baselines,
+    evaluate_active_evidence_baseline,
     evaluate_passive_memory_baseline,
     evaluate_reactive_baseline,
 )
@@ -73,6 +75,24 @@ def main() -> int:
             "config": to_jsonable(config),
             "reactive_summary": to_jsonable(reactive_summary),
             "passive_memory_summary": to_jsonable(memory_summary),
+        }
+    elif config.mode == "active_eval":
+        summary = evaluate_active_evidence_baseline(config)
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X active evidence evaluation executed.",
+            "config": to_jsonable(config),
+            "summary": to_jsonable(summary),
+        }
+    elif config.mode == "active_compare":
+        reactive_summary, memory_summary, active_summary = compare_active_baselines(config)
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X active baseline comparison executed.",
+            "config": to_jsonable(config),
+            "reactive_summary": to_jsonable(reactive_summary),
+            "passive_memory_summary": to_jsonable(memory_summary),
+            "active_evidence_summary": to_jsonable(active_summary),
         }
     else:
         raise ValueError(f"Unsupported mode: {config.mode}")

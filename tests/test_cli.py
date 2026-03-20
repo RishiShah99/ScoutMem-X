@@ -8,7 +8,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-
 def test_cli_scaffold_output() -> None:
     env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
     result = subprocess.run(

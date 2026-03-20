@@ -1,0 +1,14 @@
+{
+  "phase": "mvp3",
+  "subphase": "3.5",
+  "mode": "active_compare",
+  "max_steps": 5,
+  "query": "find the red mug",
+  "target_label": "red mug",
+  "stop_threshold": 0.8,
+  "split": "unseen",
+  "scene_ids": [
+    "garage_unseen_easy",
+    "attic_unseen_active"
+  ]
+}

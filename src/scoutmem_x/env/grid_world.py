@@ -43,6 +43,16 @@ DEFAULT_SCENES: tuple[SearchSceneSpec, ...] = (
         target_visibility={3: 0.55, 4: 0.65},
         distractors={2: "red bottle"},
     ),
+    SearchSceneSpec(
+        scene_id="attic_unseen_active",
+        split="unseen",
+        length=5,
+        target_label="red mug",
+        target_position=2,
+        target_visibility={1: 0.45, 2: 0.55},
+        distractors={3: "red toolbox"},
+        include_in_default_eval=False,
+    ),
 )
 
 
@@ -64,6 +74,8 @@ class GridSearchEnv:
     def step(self, action: AgentAction, step_index: int) -> EnvironmentStep:
         if action.action_type == ActionType.MOVE_FORWARD:
             self.agent_position = min(self.agent_position + 1, self.scene.length - 1)
+        elif action.action_type == ActionType.REVISIT:
+            self.agent_position = max(self.agent_position - 1, 0)
         elif action.action_type == ActionType.ROTATE_LEFT:
             self.heading_radians -= 0.25
         elif action.action_type == ActionType.ROTATE_RIGHT:

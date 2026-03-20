@@ -14,6 +14,7 @@ class SearchSceneSpec:
     target_position: int
     target_visibility: dict[int, float] = field(default_factory=dict)
     distractors: dict[int, str] = field(default_factory=dict)
+    include_in_default_eval: bool = True
 
     def __post_init__(self) -> None:
         if self.length <= 1:
