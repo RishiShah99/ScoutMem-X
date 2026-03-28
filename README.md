@@ -24,6 +24,7 @@ python -m pytest
 - reactive frame-only search baseline
 - passive-memory baseline with structured retrieval
 - uncertainty-aware active evidence baseline
+- robustness stress harness with clean-vs-perturbed comparisons
 - seen/unseen evaluation configs and summaries
 - initial test harness
 

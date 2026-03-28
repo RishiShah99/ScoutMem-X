@@ -53,6 +53,16 @@ DEFAULT_SCENES: tuple[SearchSceneSpec, ...] = (
         distractors={3: "red toolbox"},
         include_in_default_eval=False,
     ),
+    SearchSceneSpec(
+        scene_id="basement_unseen_stress",
+        split="unseen",
+        length=6,
+        target_label="red mug",
+        target_position=4,
+        target_visibility={2: 0.45, 3: 0.45, 4: 0.45},
+        distractors={1: "red lantern"},
+        include_in_default_eval=False,
+    ),
 )
 
 

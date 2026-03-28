@@ -8,9 +8,11 @@ from scoutmem_x.config import load_config
 from scoutmem_x.eval import (
     compare_active_baselines,
     compare_baselines,
+    compare_stress_baselines,
     evaluate_active_evidence_baseline,
     evaluate_passive_memory_baseline,
     evaluate_reactive_baseline,
+    evaluate_stress_baseline,
 )
 from scoutmem_x.serialization import to_jsonable
 from scoutmem_x.tasks import run_toy_episode
@@ -52,20 +54,20 @@ def main() -> int:
             "final_memory": to_jsonable(result.final_memory),
         }
     elif config.mode == "baseline_eval":
-        summary = evaluate_reactive_baseline(config)
+        reactive_summary = evaluate_reactive_baseline(config)
         payload = {
             "status": "ok",
             "message": "ScoutMem-X reactive baseline evaluation executed.",
             "config": to_jsonable(config),
-            "summary": to_jsonable(summary),
+            "summary": to_jsonable(reactive_summary),
         }
     elif config.mode == "memory_eval":
-        summary = evaluate_passive_memory_baseline(config)
+        memory_summary = evaluate_passive_memory_baseline(config)
         payload = {
             "status": "ok",
             "message": "ScoutMem-X passive memory evaluation executed.",
             "config": to_jsonable(config),
-            "summary": to_jsonable(summary),
+            "summary": to_jsonable(memory_summary),
         }
     elif config.mode == "baseline_compare":
         reactive_summary, memory_summary = compare_baselines(config)
@@ -77,12 +79,12 @@ def main() -> int:
             "passive_memory_summary": to_jsonable(memory_summary),
         }
     elif config.mode == "active_eval":
-        summary = evaluate_active_evidence_baseline(config)
+        active_summary = evaluate_active_evidence_baseline(config)
         payload = {
             "status": "ok",
             "message": "ScoutMem-X active evidence evaluation executed.",
             "config": to_jsonable(config),
-            "summary": to_jsonable(summary),
+            "summary": to_jsonable(active_summary),
         }
     elif config.mode == "active_compare":
         reactive_summary, memory_summary, active_summary = compare_active_baselines(config)
@@ -93,6 +95,26 @@ def main() -> int:
             "reactive_summary": to_jsonable(reactive_summary),
             "passive_memory_summary": to_jsonable(memory_summary),
             "active_evidence_summary": to_jsonable(active_summary),
+        }
+    elif config.mode == "stress_eval":
+        stress_summary = evaluate_stress_baseline(config=config, baseline="active_evidence")
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X stress evaluation executed.",
+            "config": to_jsonable(config),
+            "summary": to_jsonable(stress_summary),
+        }
+    elif config.mode == "stress_compare":
+        reactive_stress_summary, memory_stress_summary, active_stress_summary = (
+            compare_stress_baselines(config)
+        )
+        payload = {
+            "status": "ok",
+            "message": "ScoutMem-X stress comparison executed.",
+            "config": to_jsonable(config),
+            "reactive_stress_summary": to_jsonable(reactive_stress_summary),
+            "passive_memory_stress_summary": to_jsonable(memory_stress_summary),
+            "active_evidence_stress_summary": to_jsonable(active_stress_summary),
         }
     else:
         raise ValueError(f"Unsupported mode: {config.mode}")

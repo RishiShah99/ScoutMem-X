@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from scoutmem_x.config import AppConfig
 from scoutmem_x.env import SearchSceneSpec, load_default_scenes
+from scoutmem_x.perception import PerceptionAdapter
 from scoutmem_x.tasks import (
     run_active_evidence_search_episode,
     run_passive_memory_search_episode,
@@ -31,11 +32,11 @@ class EvalSummary:
 
 
 def evaluate_reactive_baseline(config: AppConfig) -> EvalSummary:
-    return _evaluate_baseline(config=config, baseline="reactive")
+    return evaluate_baseline(config=config, baseline="reactive")
 
 
 def evaluate_passive_memory_baseline(config: AppConfig) -> EvalSummary:
-    return _evaluate_baseline(config=config, baseline="passive_memory")
+    return evaluate_baseline(config=config, baseline="passive_memory")
 
 
 def compare_baselines(config: AppConfig) -> tuple[EvalSummary, EvalSummary]:
@@ -46,7 +47,7 @@ def compare_baselines(config: AppConfig) -> tuple[EvalSummary, EvalSummary]:
 
 
 def evaluate_active_evidence_baseline(config: AppConfig) -> EvalSummary:
-    return _evaluate_baseline(config=config, baseline="active_evidence")
+    return evaluate_baseline(config=config, baseline="active_evidence")
 
 
 def compare_active_baselines(config: AppConfig) -> tuple[EvalSummary, EvalSummary, EvalSummary]:
@@ -57,7 +58,11 @@ def compare_active_baselines(config: AppConfig) -> tuple[EvalSummary, EvalSummar
     )
 
 
-def _evaluate_baseline(config: AppConfig, baseline: str) -> EvalSummary:
+def evaluate_baseline(
+    config: AppConfig,
+    baseline: str,
+    perception_adapter: PerceptionAdapter | None = None,
+) -> EvalSummary:
     scenes = _select_scenes(config)
     runner = (
         run_reactive_search_episode
@@ -66,7 +71,10 @@ def _evaluate_baseline(config: AppConfig, baseline: str) -> EvalSummary:
         if baseline == "passive_memory"
         else run_active_evidence_search_episode
     )
-    results = [runner(scene=scene, config=config) for scene in scenes]
+    results = [
+        runner(scene=scene, config=config, perception_adapter=perception_adapter)
+        for scene in scenes
+    ]
     episode_briefs = tuple(
         EvalEpisodeBrief(
             scene_id=result.scene_id,

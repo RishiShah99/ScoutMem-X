@@ -1,0 +1,15 @@
+{
+  "phase": "mvp4",
+  "subphase": "4.5",
+  "mode": "stress_compare",
+  "max_steps": 6,
+  "query": "find the red mug",
+  "target_label": "red mug",
+  "stop_threshold": 0.8,
+  "split": "unseen",
+  "scene_ids": [
+    "garage_unseen_easy",
+    "basement_unseen_stress"
+  ],
+  "perturbation_name": "drop_first_target_glimpse"
+}

@@ -24,6 +24,7 @@ class AppConfig:
     stop_threshold: float
     split: str = "dev"
     scene_ids: tuple[str, ...] = ()
+    perturbation_name: str | None = None
 
     def __post_init__(self) -> None:
         if self.max_steps <= 0:
@@ -45,4 +46,9 @@ def load_config(path: str | Path) -> AppConfig:
         stop_threshold=float(raw.get("stop_threshold", 0.8)),
         split=str(raw.get("split", "dev")),
         scene_ids=_coerce_scene_ids(raw.get("scene_ids")),
+        perturbation_name=(
+            str(raw["perturbation_name"])
+            if raw.get("perturbation_name") is not None
+            else None
+        ),
     )
