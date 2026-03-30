@@ -11,7 +11,16 @@ def build_memory_snapshot(
     detections: list[Detection],
     target_label: str,
     previous_snapshot: MemorySnapshot | None = None,
+    decay_rate: float = 0.02,
 ) -> MemorySnapshot:
+    """Build a new memory snapshot by merging detections with prior memory.
+
+    Temporal decay: nodes not seen in the current step lose confidence
+    proportional to how many steps have elapsed since last observation.
+    This is what makes ScoutMem-X fundamentally different from a vector DB —
+    old, unverified memories become less trustworthy over time.
+    """
+    current_step = observation.step_index
     existing_by_key = {
         _memory_key(node.category, node.room_or_region_estimate): node
         for node in (previous_snapshot.nodes if previous_snapshot is not None else ())
@@ -32,7 +41,7 @@ def build_memory_snapshot(
 
     for key, node in tuple(existing_by_key.items()):
         if key not in seen_keys:
-            existing_by_key[key] = _mark_node_previously_seen(node)
+            existing_by_key[key] = _decay_unseen_node(node, current_step, decay_rate)
 
     merged_nodes = tuple(
         sorted(existing_by_key.values(), key=lambda node: (node.last_seen_step, node.object_id))
@@ -97,16 +106,37 @@ def _merge_detection_into_node(
     )
 
 
-def _mark_node_previously_seen(node: MemoryNode) -> MemoryNode:
-    if node.visibility_state == VisibilityState.VISIBLE:
+def _decay_unseen_node(
+    node: MemoryNode, current_step: int, decay_rate: float
+) -> MemoryNode:
+    """Apply temporal decay to a node that wasn't observed this step.
+
+    Confidence decays proportionally to how long ago the node was last seen.
+    This models the real-world intuition: "I saw the keys on the counter
+    20 minutes ago — but someone might have moved them since."
+
+    A vector DB stores an embedding forever at full strength.
+    ScoutMem-X's memory degrades — forcing the agent to re-verify
+    old observations, which is what real perception requires.
+    """
+    steps_since_seen = max(0, current_step - node.last_seen_step)
+    decay = decay_rate * steps_since_seen
+    decayed_confidence = max(0.0, node.confidence - decay)
+
+    if decayed_confidence >= 0.8:
+        next_state = VisibilityState.VISIBLE
+    elif decayed_confidence >= 0.5:
         next_state = VisibilityState.PREVIOUSLY_SEEN
+    elif decayed_confidence >= 0.2:
+        next_state = VisibilityState.UNCERTAIN
     else:
-        next_state = node.visibility_state
+        next_state = VisibilityState.HYPOTHESIZED
+
     return MemoryNode(
         object_id=node.object_id,
         category=node.category,
         query_match_score=node.query_match_score,
-        confidence=node.confidence,
+        confidence=decayed_confidence,
         last_seen_step=node.last_seen_step,
         visibility_state=next_state,
         position_estimate=node.position_estimate,

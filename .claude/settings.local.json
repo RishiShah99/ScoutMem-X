@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo:*)",
+      "Bash(pkill -f \"scoutmem_x.demo.app\")",
+      "Bash(pkill -f \"uvicorn\")",
+      "Bash(gh search:*)",
+      "mcp__tavily__tavily_search",
+      "Bash(pkill -f \"scoutmem_x.demo\")",
+      "Bash(pkill -f uvicorn)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 50384 //F)",
+      "Bash(taskkill //PID 54404 //F)",
+      "mcp__arxiv__search_papers",
+      "mcp__tavily__tavily_research"
+    ]
+  }
+}

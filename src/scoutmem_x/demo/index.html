@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ScoutMem-X — 3D Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#0d1117;font-family:'SF Mono','Consolas','Menlo',monospace;color:#e6edf3}
+#canvas-container{width:100vw;height:100vh;position:relative}
+
+/* ── overlay panels ─────────────────────────────────────── */
+.panel{position:absolute;background:rgba(13,17,23,0.88);backdrop-filter:blur(12px);
+  border:1px solid rgba(48,54,61,0.7);border-radius:14px;padding:16px;z-index:10}
+
+#title-bar{top:16px;left:16px;padding:12px 20px}
+#title-bar h1{font-size:16px;font-weight:700;letter-spacing:0.5px}
+#title-bar p{font-size:11px;color:#8b949e;margin-top:4px}
+
+#controls{bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:10px;
+  padding:10px 18px;align-items:center}
+#controls button{background:#21262d;border:1px solid #30363d;color:#e6edf3;
+  padding:8px 18px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12px;
+  transition:all 0.15s}
+#controls button:hover{background:#30363d;border-color:#8b949e}
+#controls button.primary{background:#c9872e;border-color:#c9872e;color:#0d1117;font-weight:600}
+#controls button.primary:hover{background:#e6a040}
+#search-input{background:#161b22;border:1px solid #30363d;color:#e6edf3;
+  padding:8px 14px;border-radius:8px;font-family:inherit;font-size:12px;width:200px;
+  outline:none}
+#search-input:focus{border-color:#c9872e}
+
+#memory-panel{top:16px;right:16px;width:280px;max-height:calc(100vh - 120px);
+  overflow-y:auto}
+#memory-panel h2{font-size:13px;margin-bottom:10px;color:#c9872e}
+#memory-table{width:100%;font-size:10.5px;border-collapse:collapse}
+#memory-table th{text-align:left;color:#8b949e;padding:4px 6px;border-bottom:1px solid #21262d;
+  font-weight:500}
+#memory-table td{padding:4px 6px;border-bottom:1px solid #161b22}
+.conf-bar{width:50px;height:6px;background:#161b22;border-radius:3px;display:inline-block;
+  position:relative;vertical-align:middle;margin-right:4px}
+.conf-fill{height:100%;border-radius:3px;position:absolute;left:0;top:0}
+
+#evidence-bar{margin:12px 0 8px;font-size:11px;color:#8b949e}
+#evidence-track{width:100%;height:8px;background:#161b22;border-radius:4px;margin-top:4px}
+#evidence-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#f85149,#d29922,#3fb950);
+  transition:width 0.4s}
+
+#log-panel{top:16px;right:312px;width:320px;max-height:300px;overflow-y:auto;font-size:10px;
+  line-height:1.5;color:#8b949e;display:none}
+#log-panel.visible{display:block}
+#log-panel h2{font-size:13px;color:#c9872e;margin-bottom:8px}
+
+#status{bottom:80px;left:50%;transform:translateX(-50%);padding:10px 24px;
+  font-size:13px;font-weight:600;display:none;text-align:center;
+  background:rgba(63,185,80,0.15);border:1px solid #3fb950;color:#3fb950}
+#status.visible{display:block}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div id="title-bar" class="panel">
+  <h1>ScoutMem-X</h1>
+  <p>Active Scene Memory — not just a vector database</p>
+</div>
+
+<div id="controls" class="panel">
+  <button onclick="doReset()">Reset</button>
+  <button onclick="doStep()">Step</button>
+  <button class="primary" onclick="doExplore()">Auto-Explore</button>
+  <input id="search-input" type="text" placeholder="find the red key" onkeydown="if(event.key==='Enter')doSearch()"/>
+  <button class="primary" onclick="doSearch()">Search</button>
+  <button onclick="toggleLog()" style="font-size:10px">Log</button>
+</div>
+
+<div id="memory-panel" class="panel">
+  <h2>Scene Memory</h2>
+  <div id="evidence-bar">
+    Evidence Sufficiency: <span id="evidence-val">0.00</span>
+    <div id="evidence-track"><div id="evidence-fill" style="width:0%"></div></div>
+  </div>
+  <table id="memory-table">
+    <thead><tr><th>Object</th><th>Conf</th><th>State</th><th>Room</th></tr></thead>
+    <tbody id="memory-body"></tbody>
+  </table>
+</div>
+
+<div id="log-panel" class="panel">
+  <h2>Decision Log</h2>
+  <div id="log-content"></div>
+</div>
+
+<div id="status" class="panel"></div>
+
+<script type="importmap">
+{
+  "imports":{
+    "three":"https://unpkg.com/three@0.162.0/build/three.module.js",
+    "three/addons/":"https://unpkg.com/three@0.162.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const CELL=3.2, WALL_H=1.6, GAP=0.15;
+const container=document.getElementById('canvas-container');
+
+/* ── renderer ─────────────────────────────────────────── */
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.1;
+container.appendChild(renderer.domElement);
+
+/* ── scene ────────────────────────────────────────────── */
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x080b10);
+scene.fog=new THREE.FogExp2(0x080b10,0.025);
+
+/* ── camera ───────────────────────────────────────────── */
+const camera=new THREE.PerspectiveCamera(50,window.innerWidth/window.innerHeight,0.1,200);
+camera.position.set(7,14,16);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.target.set(6,0,4.5);
+controls.enableDamping=true;
+controls.dampingFactor=0.06;
+controls.maxPolarAngle=Math.PI/2.1;
+controls.minDistance=4;
+controls.maxDistance=30;
+controls.update();
+
+/* ── lights ───────────────────────────────────────────── */
+scene.add(new THREE.AmbientLight(0x2a2a40,0.7));
+const sun=new THREE.DirectionalLight(0xffeedd,0.6);
+sun.position.set(8,18,10);sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-15;sun.shadow.camera.right=15;
+sun.shadow.camera.top=15;sun.shadow.camera.bottom=-15;
+scene.add(sun);
+
+/* ── ground ───────────────────────────────────────────── */
+const groundGeo=new THREE.PlaneGeometry(40,30);
+const groundMat=new THREE.MeshStandardMaterial({color:0x0d1117,roughness:0.9});
+const ground=new THREE.Mesh(groundGeo,groundMat);
+ground.rotation.x=-Math.PI/2;ground.position.set(6,-0.01,4.5);
+ground.receiveShadow=true;scene.add(ground);
+
+// subtle grid
+const gridHelper=new THREE.GridHelper(30,30,0x1a1f2b,0x1a1f2b);
+gridHelper.position.set(6,0.01,4.5);scene.add(gridHelper);
+
+/* ── state ────────────────────────────────────────────── */
+let roomMeshes={};
+let objectMarkers=[];
+let agentMesh=null;
+let labelDivs=[];
+let flyState=null; // camera animation
+
+/* ── build apartment ──────────────────────────────────── */
+function buildScene(state){
+  // clear old
+  Object.values(roomMeshes).forEach(g=>{scene.remove(g)});
+  objectMarkers.forEach(m=>scene.remove(m));
+  if(agentMesh)scene.remove(agentMesh);
+  labelDivs.forEach(d=>d.remove());
+  roomMeshes={};objectMarkers=[];labelDivs=[];
+
+  state.rooms.forEach(room=>{
+    const gx=room.x*CELL, gz=room.y*CELL;
+    const group=new THREE.Group();
+
+    // floor tile
+    const tileGeo=new THREE.BoxGeometry(CELL-GAP,0.12,CELL-GAP);
+    const col=new THREE.Color(room.color);
+    const tileMat=new THREE.MeshStandardMaterial({
+      color:col.clone().multiplyScalar(room.visited?0.8:0.25),
+      roughness:0.6,metalness:0.2,transparent:true,
+      opacity:room.visited?0.85:0.35
+    });
+    const tile=new THREE.Mesh(tileGeo,tileMat);
+    tile.position.set(gx+CELL/2,0.06,gz+CELL/2);
+    tile.receiveShadow=true;
+    group.add(tile);
+
+    // edge glow
+    const edgeGeo=new THREE.BoxGeometry(CELL-GAP,0.02,CELL-GAP);
+    const edgeMat=new THREE.MeshStandardMaterial({
+      color:col,emissive:col,emissiveIntensity:room.visited?0.3:0.05,
+      transparent:true,opacity:0.5
+    });
+    const edge=new THREE.Mesh(edgeGeo,edgeMat);
+    edge.position.set(gx+CELL/2,0.13,gz+CELL/2);
+    group.add(edge);
+
+    // low walls on outer edges
+    const dirs=[[0,-1,'z-'],[0,1,'z+'],[- 1,0,'x-'],[1,0,'x+']];
+    dirs.forEach(([dx,dy,side])=>{
+      const nx=room.x+dx,ny=room.y+dy;
+      const isNeighbor=state.rooms.some(r=>r.x===nx&&r.y===ny);
+      if(!isNeighbor){
+        const wallGeo=side[0]==='x'
+          ?new THREE.BoxGeometry(0.06,WALL_H,CELL-GAP)
+          :new THREE.BoxGeometry(CELL-GAP,WALL_H,0.06);
+        const wallMat=new THREE.MeshStandardMaterial({
+          color:0x1c2030,transparent:true,opacity:0.6,roughness:0.8
+        });
+        const wall=new THREE.Mesh(wallGeo,wallMat);
+        const wx=side==='x-'?gx+GAP/2:side==='x+'?gx+CELL-GAP/2:gx+CELL/2;
+        const wz=side==='z-'?gz+GAP/2:side==='z+'?gz+CELL-GAP/2:gz+CELL/2;
+        wall.position.set(wx,WALL_H/2,wz);
+        wall.castShadow=true;
+        group.add(wall);
+      }
+    });
+
+    // point light per room
+    if(room.visited){
+      const pl=new THREE.PointLight(col,0.4,6);
+      pl.position.set(gx+CELL/2,1.5,gz+CELL/2);
+      group.add(pl);
+    }
+
+    scene.add(group);
+    roomMeshes[`${room.x},${room.y}`]=group;
+
+    // room name label (HTML overlay)
+    const label=document.createElement('div');
+    label.textContent=room.name.toUpperCase();
+    label.style.cssText=`position:absolute;color:${room.visited?'#e6edf3':'#4a5060'};
+      font-size:10px;font-weight:700;font-family:inherit;pointer-events:none;
+      text-shadow:0 0 6px rgba(0,0,0,0.9);letter-spacing:0.5px;white-space:nowrap;`;
+    label._pos3=new THREE.Vector3(gx+CELL/2,0.3,gz+CELL/2);
+    container.appendChild(label);
+    labelDivs.push(label);
+
+    // object markers
+    room.objects.forEach((obj,i)=>{
+      const ox=gx+0.6+i*0.8, oz=gz+CELL/2+0.3;
+      const conf=obj.confidence;
+      const markerCol=conf>=0.8?0x3fb950:conf>=0.5?0xd29922:0xf85149;
+      const sGeo=new THREE.SphereGeometry(0.12+conf*0.08,16,16);
+      const sMat=new THREE.MeshStandardMaterial({
+        color:markerCol,emissive:markerCol,emissiveIntensity:0.6,
+        roughness:0.3,metalness:0.4
+      });
+      const sphere=new THREE.Mesh(sGeo,sMat);
+      sphere.position.set(ox,0.25+conf*0.15,oz);
+      sphere.castShadow=true;
+      scene.add(sphere);
+      objectMarkers.push(sphere);
+
+      // object label
+      const ol=document.createElement('div');
+      const stateTag=obj.state==='visible'?'VER':obj.state==='previously_seen'?'SEEN':
+        obj.state==='uncertain'?'UNC':'WEAK';
+      ol.innerHTML=`<span style="color:${markerCol===0x3fb950?'#3fb950':markerCol===0xd29922?'#d29922':'#f85149'}">${obj.label}</span> <span style="color:#8b949e">${conf.toFixed(2)}</span>`;
+      ol.style.cssText=`position:absolute;font-size:9px;pointer-events:none;
+        text-shadow:0 0 4px rgba(0,0,0,0.9);white-space:nowrap;`;
+      ol._pos3=new THREE.Vector3(ox,0.5+conf*0.15,oz);
+      container.appendChild(ol);
+      labelDivs.push(ol);
+    });
+  });
+
+  // agent
+  const ax=state.agent.x*CELL+CELL/2, az=state.agent.y*CELL+CELL/2;
+  const aGeo=new THREE.SphereGeometry(0.22,24,24);
+  const aMat=new THREE.MeshStandardMaterial({
+    color:0xf0c040,emissive:0xf0c040,emissiveIntensity:1.0,roughness:0.2,metalness:0.5
+  });
+  agentMesh=new THREE.Mesh(aGeo,aMat);
+  agentMesh.position.set(ax,0.5,az);
+  agentMesh.castShadow=true;
+  scene.add(agentMesh);
+
+  // agent glow
+  const glowGeo=new THREE.SphereGeometry(0.45,16,16);
+  const glowMat=new THREE.MeshBasicMaterial({color:0xf0c040,transparent:true,opacity:0.12});
+  const glow=new THREE.Mesh(glowGeo,glowMat);
+  glow.position.copy(agentMesh.position);
+  scene.add(glow);
+  objectMarkers.push(glow); // for cleanup
+}
+
+/* ── label projection ─────────────────────────────────── */
+function updateLabels(){
+  const w=container.clientWidth,h=container.clientHeight;
+  labelDivs.forEach(el=>{
+    if(!el._pos3)return;
+    const v=el._pos3.clone().project(camera);
+    if(v.z>1||v.z<-1){el.style.display='none';return;}
+    el.style.display='block';
+    el.style.left=((v.x+1)/2*w)+'px';
+    el.style.top=((-v.y+1)/2*h)+'px';
+  });
+}
+
+/* ── camera fly-to ────────────────────────────────────── */
+function flyTo(tx,tz){
+  flyState={
+    startPos:camera.position.clone(),
+    endPos:new THREE.Vector3(tx+2,8,tz+8),
+    startTarget:controls.target.clone(),
+    endTarget:new THREE.Vector3(tx,0,tz),
+    t:0
+  };
+}
+function updateFly(){
+  if(!flyState)return;
+  flyState.t=Math.min(flyState.t+0.012,1);
+  const ease=flyState.t*flyState.t*(3-2*flyState.t);// smoothstep
+  camera.position.lerpVectors(flyState.startPos,flyState.endPos,ease);
+  controls.target.lerpVectors(flyState.startTarget,flyState.endTarget,ease);
+  if(flyState.t>=1)flyState=null;
+}
+
+/* ── UI updates ───────────────────────────────────────── */
+function updateMemoryPanel(state){
+  const body=document.getElementById('memory-body');
+  const allObjs=state.rooms.flatMap(r=>r.objects.map(o=>({...o,room:r.name})));
+  allObjs.sort((a,b)=>b.confidence-a.confidence);
+  body.innerHTML=allObjs.map(o=>{
+    const pct=Math.round(o.confidence*100);
+    const col=o.confidence>=0.8?'#3fb950':o.confidence>=0.5?'#d29922':'#f85149';
+    const stateLabel=o.state==='visible'?'VERIFIED':o.state==='previously_seen'?'SEEN':
+      o.state==='uncertain'?'UNC':o.state==='hypothesized'?'WEAK':o.state;
+    return `<tr>
+      <td>${o.label}</td>
+      <td><span class="conf-bar"><span class="conf-fill" style="width:${pct}%;background:${col}"></span></span>${o.confidence.toFixed(2)}</td>
+      <td style="color:${col};font-size:9px">${stateLabel}</td>
+      <td style="color:#8b949e;font-size:9px">${o.room}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('evidence-val').textContent=state.evidence.toFixed(2);
+  document.getElementById('evidence-fill').style.width=(state.evidence*100)+'%';
+}
+
+function updateLog(log){
+  document.getElementById('log-content').innerHTML=
+    log.map(l=>`<div style="margin-bottom:2px">${l}</div>`).join('');
+}
+
+function showStatus(msg,isSuccess){
+  const el=document.getElementById('status');
+  el.textContent=msg;
+  el.style.background=isSuccess?'rgba(63,185,80,0.15)':'rgba(248,81,73,0.15)';
+  el.style.borderColor=isSuccess?'#3fb950':'#f85149';
+  el.style.color=isSuccess?'#3fb950':'#f85149';
+  el.classList.add('visible');
+  setTimeout(()=>el.classList.remove('visible'),4000);
+}
+
+/* ── API helpers ──────────────────────────────────────── */
+async function api(method,path,params){
+  const url=new URL(path,location.origin);
+  if(params)Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  const res=await fetch(url,{method});
+  return res.json();
+}
+
+async function refresh(){
+  const s=await api('GET','/api/state');
+  buildScene(s);updateMemoryPanel(s);updateLog(s.log);
+}
+
+/* ── button handlers (attached to window) ─────────────── */
+window.doReset=async()=>{
+  const s=await api('POST','/api/reset');
+  buildScene(s);updateMemoryPanel(s);updateLog(s.log);
+  camera.position.set(7,14,16);controls.target.set(6,0,4.5);
+  showStatus('World reset',true);
+};
+
+window.doStep=async()=>{
+  const s=await api('POST','/api/step');
+  buildScene(s);updateMemoryPanel(s);updateLog(s.log);
+  if(s.done)showStatus('All rooms explored!',true);
+  // fly camera to agent
+  flyTo(s.agent.x*CELL+CELL/2, s.agent.y*CELL+CELL/2);
+};
+
+window.doExplore=async()=>{
+  const s=await api('POST','/api/explore');
+  buildScene(s);updateMemoryPanel(s);updateLog(s.log);
+  showStatus(`Explored ${s.memoryCount} objects in ${s.step} steps`,true);
+};
+
+window.doSearch=async()=>{
+  const q=document.getElementById('search-input').value.trim();
+  if(!q)return;
+  const s=await api('POST','/api/search',{q});
+  buildScene(s);updateMemoryPanel(s);updateLog(s.log);
+  if(s.found){
+    showStatus(`Found "${q.replace('find the ','')}" in ${s.room} — conf ${s.confidence}`,true);
+    if(s.targetPos)flyTo(s.targetPos[0]*CELL+CELL/2, s.targetPos[1]*CELL+CELL/2);
+  }else{
+    showStatus(s.message||'Not found',false);
+  }
+};
+
+window.toggleLog=()=>{
+  document.getElementById('log-panel').classList.toggle('visible');
+};
+
+/* ── animation loop ───────────────────────────────────── */
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=clock.getDelta();
+
+  // agent float
+  if(agentMesh){
+    agentMesh.position.y=0.5+Math.sin(Date.now()*0.003)*0.08;
+  }
+
+  updateFly();
+  controls.update();
+  updateLabels();
+  renderer.render(scene,camera);
+}
+
+/* ── resize ───────────────────────────────────────────── */
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+
+/* ── init ─────────────────────────────────────────────── */
+refresh();
+animate();
+</script>
+</body>
+</html>
