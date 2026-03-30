@@ -157,7 +157,7 @@ def run_random_baseline(n_episodes: int = 100, seed: int = 42) -> dict[str, floa
         for step in range(env.max_steps):
             action = random.choice([0, 1, 2, 3])  # random movement only
             if step == env.max_steps - 1:
-                action = 5  # force stop at end
+                action = 4  # force stop at end
             obs, reward, term, trunc, info = env.step(action)
             ep_reward += reward
             if term or trunc:
@@ -188,20 +188,15 @@ def run_rule_based(n_episodes: int = 100, seed: int = 42) -> dict[str, float]:
         for step in range(env.max_steps):
             conf = info["target_confidence"]
 
-            # Rule-based policy:
-            # 1. If confidence >= 0.7, stop
-            if conf >= 0.7:
-                action = 5  # STOP
-            # 2. If target visible with medium confidence, inspect
-            elif 0.3 <= conf < 0.7 and info["evidence_sufficiency"] > 0.3:
-                action = 4  # INSPECT
-            # 3. Otherwise, move toward unexplored areas
+            # Rule-based policy (5 actions: 0-3 move, 4 stop):
+            # 1. If confidence >= 0.5, stop (we're sure enough)
+            if conf >= 0.5:
+                action = 4  # STOP
+            # 2. Otherwise, move toward unexplored areas
             else:
-                # Pick a direction toward unvisited cells
-                best_action = _pick_exploration_action(
+                action = _pick_exploration_action(
                     info["agent_pos"], visited_cells, env.grid_size
                 )
-                action = best_action
 
             obs, reward, term, trunc, info = env.step(action)
             visited_cells.add(info["agent_pos"])
@@ -222,27 +217,47 @@ def run_rule_based(n_episodes: int = 100, seed: int = 42) -> dict[str, float]:
 
 
 def run_rl_policy(
-    model_path: str, n_episodes: int = 100, seed: int = 42
+    model_path: str, n_episodes: int = 100, seed: int = 42,
+    vec_normalize_path: str | None = None,
 ) -> dict[str, float]:
     """RL-trained exploration + ScoutMem-X memory."""
+    from pathlib import Path
+
     from stable_baselines3 import PPO
+    from stable_baselines3.common.env_util import make_vec_env
+    from stable_baselines3.common.vec_env import VecNormalize
 
     model = PPO.load(model_path)
-    env = ScoutMemEnv(grid_size=5, max_steps=25)
+
+    # Use VecNormalize to match training conditions
+    eval_venv = make_vec_env(
+        lambda: ScoutMemEnv(grid_size=5, max_steps=25), n_envs=1,
+    )
+    if vec_normalize_path is None:
+        candidate = Path(model_path).parent.parent / "vec_normalize.pkl"
+        if candidate.exists():
+            vec_normalize_path = str(candidate)
+    if vec_normalize_path and Path(vec_normalize_path).exists():
+        eval_venv = VecNormalize.load(vec_normalize_path, eval_venv)
+        eval_venv.training = False
+        eval_venv.norm_reward = False
+
     successes, total_steps, total_reward = 0, 0, 0.0
 
     for ep in range(n_episodes):
-        obs, info = env.reset(seed=seed + ep)
+        obs = eval_venv.reset()
         ep_reward = 0.0
-        for step in range(env.max_steps):
+        for step in range(25):
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, term, trunc, info = env.step(int(action))
-            ep_reward += reward
-            if term or trunc:
-                if reward > 0:
+            obs, rewards, dones, infos = eval_venv.step(action)
+            ep_reward += float(rewards[0])
+            if dones[0]:
+                if float(rewards[0]) > 0:
                     successes += 1
                 total_steps += step + 1
                 break
+        else:
+            total_steps += 25
         total_reward += ep_reward
 
     return {

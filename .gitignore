@@ -6,10 +6,8 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
-
 *.egg-info/
-AGENTS.md
-pyproject.toml
+
 # Environment and local config
 .env
 .env.*
@@ -29,3 +27,11 @@ coverage.xml
 # Logs and outputs
 *.log
 outputs/
+
+# Project-specific excludes
+.claude/
+*.md
+frontend/
+*.zip
+*.ipynb
+reports/

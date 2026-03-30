@@ -2,6 +2,7 @@
 
 Usage:
     python -m scoutmem_x.rl.train --timesteps 500000
+    python -m scoutmem_x.rl.train --difficulty easy --timesteps 100000
     python -m scoutmem_x.rl.train --eval --eval-model outputs/rl/best_model/best_model
 """
 
@@ -11,48 +12,56 @@ import argparse
 import json
 from pathlib import Path
 
+import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecNormalize
 
 from scoutmem_x.rl.env import ScoutMemEnv
 
 
-def make_env(seed: int = 0) -> ScoutMemEnv:
-    env = ScoutMemEnv(grid_size=5, n_objects=6, n_distractors=2, max_steps=25)
+def make_env(difficulty: str = "hard", seed: int = 0) -> ScoutMemEnv:
+    factories = {"easy": ScoutMemEnv.easy, "medium": ScoutMemEnv.medium, "hard": ScoutMemEnv.hard}
+    env = factories[difficulty]()
     env.reset(seed=seed)
     return env
 
 
-def train(timesteps: int = 50_000, output_dir: str = "outputs/rl") -> Path:
+def train(
+    timesteps: int = 50_000,
+    output_dir: str = "outputs/rl",
+    difficulty: str = "easy",
+    seed: int = 42,
+) -> Path:
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    print(f"Training PPO for {timesteps:,} timesteps...")
+    print(f"Training PPO for {timesteps:,} timesteps on {difficulty} difficulty (seed={seed})")
     print(f"Output: {out}")
 
-    train_env = make_vec_env(lambda: make_env(seed=42), n_envs=8)
+    np.random.seed(seed)
+
+    train_env = make_vec_env(lambda: make_env(difficulty=difficulty, seed=seed), n_envs=8)
     train_env = VecNormalize(
-        train_env, norm_obs=True, norm_reward=True, clip_reward=5.0,
+        train_env, norm_obs=True, norm_reward=False, clip_reward=5.0,
     )
-    # Eval env must also be wrapped in VecNormalize to match training env
-    eval_env = make_vec_env(lambda: make_env(seed=99), n_envs=1)
+    eval_env = make_vec_env(lambda: make_env(difficulty=difficulty, seed=seed + 1000), n_envs=1)
     eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=False, training=False)
 
     model = PPO(
         "MlpPolicy",
         train_env,
         verbose=1,
+        seed=seed,
         learning_rate=3e-4,
-        n_steps=256,
-        batch_size=256,
+        n_steps=512,
+        batch_size=64,
         n_epochs=10,
-        gamma=0.98,
+        gamma=0.95,
         gae_lambda=0.95,
         clip_range=0.2,
-        ent_coef=0.02,
+        ent_coef=0.05,
         vf_coef=0.5,
         max_grad_norm=0.5,
         normalize_advantage=True,
@@ -82,31 +91,47 @@ def train(timesteps: int = 50_000, output_dir: str = "outputs/rl") -> Path:
     return out / "final_model.zip"
 
 
-def evaluate(model_path: str, n_episodes: int = 100) -> dict[str, float]:
+def evaluate(
+    model_path: str, n_episodes: int = 100, difficulty: str = "hard",
+    vec_normalize_path: str | None = None,
+) -> dict[str, float]:
     model = PPO.load(model_path)
-    env = make_env(seed=123)
+
+    # Wrap in VecNormalize if stats file exists (model was trained with norm_obs=True)
+    eval_venv = make_vec_env(lambda: make_env(difficulty=difficulty, seed=123), n_envs=1)
+    if vec_normalize_path is None:
+        # Try to find vec_normalize.pkl next to the model
+        model_dir = Path(model_path).parent
+        candidate = model_dir.parent / "vec_normalize.pkl"
+        if candidate.exists():
+            vec_normalize_path = str(candidate)
+
+    if vec_normalize_path and Path(vec_normalize_path).exists():
+        eval_venv = VecNormalize.load(vec_normalize_path, eval_venv)
+        eval_venv.training = False
+        eval_venv.norm_reward = False
+        print(f"  Loaded VecNormalize from {vec_normalize_path}")
 
     successes = 0
     total_steps = 0
     total_reward = 0.0
 
     for ep in range(n_episodes):
-        obs, info = env.reset()
+        obs = eval_venv.reset()
         ep_reward = 0.0
 
-        for step in range(env.max_steps):
+        for step in range(25):  # max_steps fallback
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, term, trunc, info = env.step(int(action))
-            ep_reward += reward
+            obs, rewards, dones, infos = eval_venv.step(action)
+            ep_reward += float(rewards[0])
 
-            if term:
-                if reward > 0:
+            if dones[0]:
+                if float(rewards[0]) > 0:
                     successes += 1
                 total_steps += step + 1
                 break
-            if trunc:
-                total_steps += step + 1
-                break
+        else:
+            total_steps += 25
 
         total_reward += ep_reward
 
@@ -121,17 +146,25 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Train ScoutMem-X RL policy")
     parser.add_argument("--timesteps", type=int, default=50_000)
     parser.add_argument("--output", type=str, default="outputs/rl")
+    parser.add_argument("--difficulty", type=str, default="easy",
+                        choices=["easy", "medium", "hard"])
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--eval-model", type=str, default=None)
     args = parser.parse_args()
 
     if args.eval:
         model_path = args.eval_model or f"{args.output}/final_model"
-        print(f"Evaluating {model_path}...")
-        metrics = evaluate(model_path)
+        print(f"Evaluating {model_path} on {args.difficulty}...")
+        metrics = evaluate(model_path, difficulty=args.difficulty)
         print(json.dumps(metrics, indent=2))
     else:
-        train(timesteps=args.timesteps, output_dir=args.output)
+        train(
+            timesteps=args.timesteps,
+            output_dir=args.output,
+            difficulty=args.difficulty,
+            seed=args.seed,
+        )
 
 
 if __name__ == "__main__":
