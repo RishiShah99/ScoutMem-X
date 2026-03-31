@@ -30,7 +30,9 @@ outputs/
 
 # Project-specific excludes
 .claude/
+# Exclude all .md except README
 *.md
+!README.md
 frontend/
 *.zip
 *.ipynb
