@@ -110,7 +110,12 @@ class CurriculumCallback(BaseCallback):
         factory = getattr(ScoutMemEnv, level.factory)
 
         # Wrap in VecNormalize to match training observations
-        eval_venv = make_vec_env(lambda: factory(seed=self.seed + 9999), n_envs=1)
+        def _make_eval_env() -> ScoutMemEnv:
+            env = factory()
+            env.reset(seed=self.seed + 9999)
+            return env
+
+        eval_venv = make_vec_env(_make_eval_env, n_envs=1)
         eval_venv = VecNormalize(eval_venv, norm_obs=True, norm_reward=False, training=False)
         # Copy running stats from training env
         train_venv = self.model.get_env()  # type: ignore[union-attr]
@@ -154,10 +159,13 @@ class CurriculumCallback(BaseCallback):
         )
 
         new_factory = getattr(ScoutMemEnv, new_level.factory)
-        new_train_env = make_vec_env(
-            lambda: new_factory(seed=self.seed),
-            n_envs=self.n_envs,
-        )
+
+        def _make_train_env() -> ScoutMemEnv:
+            env = new_factory()
+            env.reset(seed=self.seed)
+            return env
+
+        new_train_env = make_vec_env(_make_train_env, n_envs=self.n_envs)
         new_train_env = VecNormalize(
             new_train_env, norm_obs=True, norm_reward=False, clip_reward=5.0,
         )
