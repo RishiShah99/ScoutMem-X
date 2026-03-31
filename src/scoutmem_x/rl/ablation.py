@@ -37,7 +37,7 @@ from scoutmem_x.rl.env import ScoutMemEnv
 ALL_CONDITIONS = [
     "full", "no_frame_stack", "no_belief", "no_conf_reward", "no_decay", "random_policy",
 ]
-SEEDS = [0, 1000, 2000]
+SEEDS = [0, 1000, 2000, 3000, 4000]
 N_EVAL_EPISODES = 100
 
 
