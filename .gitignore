@@ -33,6 +33,7 @@ outputs/
 # Exclude all .md except README
 *.md
 !README.md
+!portfolio/scoutmem_x_writeup.md
 frontend/
 *.zip
 *.ipynb
