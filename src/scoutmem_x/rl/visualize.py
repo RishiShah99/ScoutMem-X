@@ -121,7 +121,7 @@ def plot_multiseed(output_dir: Path) -> None:
 def plot_ablation(output_dir: Path) -> None:
     """Ablation study grouped bar chart."""
     # Try v2 first, then v1
-    for p in ["outputs/ablation_v2/ablation_results.json", "outputs/ablation/ablation_results.json"]:
+    for p in ["outputs/ablation_v3/ablation_results.json", "outputs/ablation_v2/ablation_results.json", "outputs/ablation/ablation_results.json"]:
         if Path(p).exists():
             with open(p) as f:
                 results = json.load(f)
@@ -157,7 +157,7 @@ def plot_ablation(output_dir: Path) -> None:
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels, fontsize=9)
     ax.set_ylabel("Success Rate (%)")
-    ax.set_title("Ablation Study: Component Contributions (Hard, 3 seeds)")
+    ax.set_title("Ablation Study: Component Contributions (Hard, 5 seeds)")
     ax.set_ylim(0, 70)
 
     fig.tight_layout()
